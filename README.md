@@ -19,7 +19,8 @@ A browser-only mastering tool tuned for the typical flaws of AI-generated music.
 - **ラウドネス**：ITU-R BS.1770 準拠のLUFS測定、先読みリミッター。全曲を測り直して目標LUFSとピーク上限に合わせる
 - **聴き比べ**：処理前後を同期再生し、A/B切り替え。音量を揃えた比較が標準（大きいほうが良く聴こえる錯覚を防ぐ）
 - **スペクトル表示**：処理前後を重ねて表示
-- **ジャンル別プリセット**：J-POP、アニソン・ボカロ、ロック、メタル、EDM・ダンス、ヒップホップ、R&B・ソウル、バラード、アコースティック、ジャズ、クラシック・オーケストラ、Lo-fi・チル、アンビエントの13種類。ワンタップでバランスと目標ラウドネスを合わせ、自動診断の結果（こもりの帯域・量、高域の欠け）で曲ごとに補正
+- **ジャンル別プリセット**：J-POP、アニソン・ボカロ、ロック、パンク、メタル、EDM・ダンス、テクノ、ヒップホップ、R&B・ソウル、バラード、アコースティック、ジャズ、クラシック・オーケストラ、Lo-fi・チル、アンビエントの15種類。ワンタップでバランスと目標ラウドネスを合わせ、自動診断の結果（こもりの帯域・量、高域の欠け）で曲ごとに補正
+- **やり直し**：一つ前の設定に戻す（最大50回）、初期設定に戻す
 - **用途別プリセット**：AIこもり除去（標準）、ナチュラル、ボーカルを前に、強めの音圧、音量合わせのみ
 - **書き出し**：WAV 24bit／16bit（TPDFディザ付き）、MP3 320kbps／192kbps
 
@@ -61,7 +62,8 @@ AI Mastering Studio cleans up the mud and the harsh, swirly top end that AI musi
 - Low-mid "mud" cut, a dynamic high-band suppressor for AI shimmer, air shelf, low cut, mono bass (M/S), width, saturation and glue compression
 - BS.1770 loudness measurement and a look-ahead limiter; the export re-measures the whole song to hit the target LUFS and ceiling
 - Synced, loudness-matched A/B, before/after spectrum
-- 13 genre presets (J-POP, anime/Vocaloid, rock, metal, EDM, hip-hop, R&B, ballad, acoustic, jazz, classical, lo-fi, ambient), optionally adjusted by the track's own analysis
+- 15 genre presets (J-POP, anime/Vocaloid, rock, punk, metal, EDM, techno, hip-hop, R&B, ballad, acoustic, jazz, classical, lo-fi, ambient), optionally adjusted by the track's own analysis
+- Undo (up to 50 steps) and reset to defaults
 - WAV export (24-bit, or 16-bit with TPDF dither) and MP3 export (320/192 kbps, via lamejs loaded on demand)
 
 Use it at https://reekoby.github.io/ai-mastering-studio/ or download `index.html` and open it locally. No audio ever leaves your device.

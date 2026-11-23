@@ -60,6 +60,8 @@ input[type=range]{grid-column:1/-1;width:100%;height:30px;accent-color:var(--acc
 .diag b{font-family:Archivo,"Noto Sans JP",sans-serif}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
 .chips .btn{font-size:14px}
+
+.tools{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:10px;align-items:center}.tools .note{margin:0 0 0 4px}
 h3{font:700 15px "Noto Sans JP",sans-serif;margin:18px 0 8px;color:var(--mut)}
 .gdesc{margin:12px 0 4px;font-size:15px;background:var(--soft);border-radius:10px;padding:10px 12px}
 .chk.sm{font-size:14px;align-items:flex-start;min-height:0;margin-top:8px}.chk.sm input{flex:none;margin-top:3px}
@@ -94,8 +96,8 @@ footer{max-width:1240px;margin:0 auto;padding:0 max(5vw,16px) 40px;color:var(--m
 </div></header>
 <main class="band grid">
   <section class="col">
-    <div class="card"><h2>ジャンル別プリセット</h2><p class="note">曲のジャンルを選ぶだけで、音のバランスと音量をそのジャンルの定番に合わせます。</p><div id="genres" class="chips"></div><p id="gdesc" class="gdesc">ジャンルを選んでください。</p><label class="chk sm"><input type="checkbox" id="blend" checked>自動診断の結果も加味する（こもりの帯域と量、高域の欠けを曲に合わせて補正）</label><h3>用途別</h3><div id="presets" class="chips"></div></div>
     <div class="card"><h2>自動診断</h2><ul id="diag" class="diag"><li>音源を開くと、こもり・高域の欠け・ステレオ感・音量を測って設定を提案します。</li></ul><button id="auto" class="btn pri" disabled>診断結果を設定に反映</button></div>
+    <div class="card"><h2>ジャンル別プリセット</h2><p class="note">曲のジャンルを選ぶだけで、音のバランスと音量をそのジャンルの定番に合わせます。</p><div id="genres" class="chips"></div><p id="gdesc" class="gdesc">ジャンルを選んでください。</p><label class="chk sm"><input type="checkbox" id="blend" checked>自動診断の結果も加味する（こもりの帯域と量、高域の欠けを曲に合わせて補正）</label><h3>用途別</h3><div id="presets" class="chips"></div></div>
     <div class="card"><h2>書き出し</h2><p class="note">全曲を同じ設定で処理して保存します。配信サービスへの入稿はWAV、SNSや共有にはMP3がおすすめです（Claude上で開いた場合は、保存できる形式の都合でZIPに入れて保存します）。</p><div class="row"><select id="bits" aria-label="書き出し形式"><option value="24">WAV 24bit</option><option value="16">WAV 16bit（ディザ付き）</option><option value="mp3-320">MP3 320kbps</option><option value="mp3-192">MP3 192kbps</option></select><button id="export" class="btn pri" disabled>書き出す</button></div><p id="exmsg" class="note" style="margin:12px 0 0" aria-live="polite"></p></div>
   </section>
   <section class="col mods" id="mods"></section>
@@ -116,8 +118,10 @@ const GK=['hpf','low','mono','width','mudF','mud','pres','hsF','hs','air','sat',
 const GEN=[['J-POP','歌を前に、明るく今どきの音圧に',[28,0.5,120,1.08,300,3,1,6500,45,2.5,12,30,-12,-1]],
 ['アニソン・ボカロ','声とシンセを抜けよく、密度高めに',[30,0.5,130,1.1,300,3.5,1.5,6000,55,2.5,15,40,-10,-1]],
 ['ロック','ギターの中域を残しつつ、こもりを整理',[32,0.5,120,1.05,350,3,1.5,5500,50,1.5,30,40,-11,-1]],
+['パンク','勢いのあるギターと歌を前へ、荒さは残す',[32,0.5,130,1.05,350,3,2,5500,55,1.5,25,45,-10,-1]],
 ['メタル','歪みの刺さりを抑え、低域をタイトに',[35,0,150,1.05,400,4,1,5000,60,1,35,50,-10,-1]],
 ['EDM・ダンス','キックとベースを太く、横に広く、大きく',[25,2,150,1.15,250,3,0.5,7000,45,3,20,50,-9,-0.8]],
+['テクノ','キックを締めて太く、低域はモノラルで安定させる',[25,2,160,1.1,250,2.5,0,7500,40,2,15,45,-9,-0.8]],
 ['ヒップホップ','低音を厚く、ボーカルをはっきり',[22,2.5,140,1.05,280,3,1,6500,40,2,18,40,-10,-1]],
 ['R&B・ソウル','なめらかな低域と艶のある高域',[25,1.5,120,1.1,280,3,0.5,7000,40,2,15,30,-12,-1]],
 ['バラード','抑揚を残して、歌の息づかいを生かす',[28,0.5,100,1.08,260,2.5,1,7000,40,2,8,20,-14,-1]],
@@ -250,19 +254,25 @@ if(playing){const px=x0+pos()/S.dur*W;g.fillStyle='#ff5b45';g.fillRect(px-1,0,3,
 function loop(){if(!playing)return;AN.a.getFloatFrequencyData(AN.fa);AN.b.getFloatFrequencyData(AN.fb);drawSpec(AN.fa,AN.fb,ctx.sampleRate/8192,false);drawWave();requestAnimationFrame(loop)}
 /* ---------- UI ---------- */
 const fmt=(q,v)=>q[0]==='mono'&&v==0?'オフ':q[6]==='Hz'&&v>=1000?(v/1000).toFixed(1)+' kHz':q[6]==='×'?(+v).toFixed(2)+'×':(q[6]==='dB'&&v>0?'+':'')+(+v).toFixed(q[5]<1?1:0)+' '+q[6];
-$('#mods').innerHTML=Object.entries(G).map(([k,[t,h]])=>`<div class="card"><h2>${t}</h2><p class="note">${h}</p>${P.filter(q=>q[2]===k).map(q=>`<div class="ctl"><label for="p-${q[0]}">${q[1]}</label><output id="o-${q[0]}"></output><input type="range" id="p-${q[0]}" min="${q[3]}" max="${q[4]}" step="${q[5]}"></div>`).join('')}</div>`).join('');
+$('#mods').innerHTML=`<div class="tools card"><button id="undo" class="btn" disabled>↶ 一つ前に戻す</button><button id="reset" class="btn">初期設定に戻す</button><span id="hist" class="note"></span></div>`+Object.entries(G).map(([k,[t,h]])=>`<div class="card"><h2>${t}</h2><p class="note">${h}</p>${P.filter(q=>q[2]===k).map(q=>`<div class="ctl"><label for="p-${q[0]}">${q[1]}</label><output id="o-${q[0]}"></output><input type="range" id="p-${q[0]}" min="${q[3]}" max="${q[4]}" step="${q[5]}"></div>`).join('')}</div>`).join('');
 function show(){P.forEach(q=>{$('#p-'+q[0]).value=p[q[0]];$('#o-'+q[0]).textContent=fmt(q,p[q[0]])});document.querySelectorAll('#genres .btn,#presets .btn').forEach(b=>b.setAttribute('aria-pressed',b.dataset.k===sel))}
+const DEF={};P.forEach(q=>DEF[q[0]]=q[7]);const hist=[];let dragging=false;
+function snap(){hist.push({p:{...p},sel});if(hist.length>50)hist.shift();uh()}
+function uh(){$('#undo').disabled=!hist.length;$('#hist').textContent=hist.length?`戻せる操作：${hist.length}`:''}
 function save(){try{localStorage.setItem('aimaster.p',JSON.stringify(p));localStorage.setItem('aimaster.sel',sel)}catch(e){}}
-P.forEach(q=>$('#p-'+q[0]).addEventListener('input',e=>{p[q[0]]=+e.target.value;show();save();sched()}));
+P.forEach(q=>$('#p-'+q[0]).addEventListener('change',()=>{dragging=false}));
+P.forEach(q=>$('#p-'+q[0]).addEventListener('input',e=>{if(!dragging){snap();dragging=true}p[q[0]]=+e.target.value;show();save();sched()}));
 $('#presets').innerHTML=Object.keys(PR).map(k=>`<button class="btn" data-k="${k}" aria-pressed="false">${k}</button>`).join('');
-$('#presets').addEventListener('click',e=>{const b=e.target.closest('.btn');if(!b)return;sel=b.dataset.k;Object.assign(p,PR[sel]);$('#gdesc').textContent=sel+'：用途別の設定を適用しました。';show();save();sched()});
+$('#presets').addEventListener('click',e=>{const b=e.target.closest('.btn');if(!b)return;snap();sel=b.dataset.k;Object.assign(p,PR[sel]);$('#gdesc').textContent=sel+'：用途別の設定を適用しました。';show();save();sched()});
 $('#genres').innerHTML=GEN.map(g=>`<button class="btn" data-k="${g[0]}" aria-pressed="false">${g[0]}</button>`).join('');
 function applyGenre(name){const g=GEN.find(x=>x[0]===name);if(!g)return;const v=gp(g[2]);let extra='';
 if($('#blend').checked&&sug){v.mudF=sug.mudF;v.mud=h5((v.mud+sug.mud)/2);v.air=cl(h5((v.air+sug.air)/2),-3,6);v.hpf=Math.max(v.hpf,sug.hpf);if(sug.width>1.1)v.width=Math.max(v.width,1.1);if(sug.width<1)v.width=Math.min(v.width,1);extra='（この曲の診断結果で補正済み）'}
-sel=name;Object.assign(p,v);$('#gdesc').textContent=`${name}：${g[1]}。目標 ${v.lufs} LUFS${extra}`;show();save();sched()}
+snap();sel=name;Object.assign(p,v);$('#gdesc').textContent=`${name}：${g[1]}。目標 ${v.lufs} LUFS${extra}`;show();save();sched()}
+$('#undo').onclick=()=>{const h=hist.pop();if(!h)return;Object.assign(p,h.p);sel=h.sel;dragging=false;uh();$('#gdesc').textContent=sel?sel+'：一つ前の設定に戻しました。':'一つ前の設定に戻しました。';show();save();sched()};
+$('#reset').onclick=()=>{snap();Object.assign(p,DEF);sel='';$('#gdesc').textContent='初期設定に戻しました。ジャンルを選ぶとそのジャンル向けに合わせます。';show();save();sched()};
 $('#genres').addEventListener('click',e=>{const b=e.target.closest('.btn');if(b)applyGenre(b.dataset.k)});
 $('#blend').onchange=()=>{if(GEN.some(g=>g[0]===sel))applyGenre(sel)};
-$('#auto').onclick=()=>{if(!sug)return;sel='';Object.assign(p,sug);show();save();sched();st('診断結果を反映しました')};
+$('#auto').onclick=()=>{if(!sug)return;snap();sel='';Object.assign(p,sug);show();save();sched();st('診断結果を反映しました')};
 async function loadFile(f){if(!f)return;ensureCtx();st('読み込み中…');try{const b=await ctx.decodeAudioData(await f.arrayBuffer());const L=b.getChannelData(0);st('解析中…');setTimeout(()=>init(L,b.numberOfChannels>1?b.getChannelData(1):L,b.sampleRate,f.name),20)}catch(e){st('この形式は読み込めませんでした')}}
 $('#file').onchange=e=>loadFile(e.target.files[0]);
 $('#openlbl').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('#file').click()}};
