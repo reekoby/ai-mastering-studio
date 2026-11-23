@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI音源マスタリング</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE: 静かで精密な制作ツール。数字ははっきり、説明は短く。
+   IDEA: マスタリングスタジオのラック。上段がアナライザー、下段がモジュール。
+   PICTURE: 処理前後を重ねたスペクトル＋曲全体の波形とプレビュー区間。
+   COLOUR and TYPE: コバルトの帯を主役に白地、処理後だけコーラル。Archivo（数値）＋Noto Sans JP。
+   LAYOUT: 上はフル幅の帯に再生とメーター、下は左に診断・書き出し、右にモジュール。600px以下は縦積み。 */
+:root{color-scheme:light dark;--bg:light-dark(#ffffff,#0d0f17);--ink:light-dark(#151826,#eceef6);--mut:light-dark(#596075,#9aa1b8);--line:light-dark(#e2e5ee,#262b3c);--card:light-dark(#ffffff,#141826);--deck:light-dark(#2340d0,#17246c);--acc:#ff5b45;--soft:light-dark(#f2f4fa,#1a1f30)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 "Noto Sans JP",system-ui,sans-serif;overflow-x:clip}
+.band{padding:clamp(22px,4vw,52px) max(5vw,16px)}
+.deck{background:var(--deck);color:#fff}
+.wrap{max-width:1240px;margin:0 auto}
+.top{display:flex;flex-wrap:wrap;gap:16px 28px;align-items:flex-end;justify-content:space-between;margin-bottom:20px}
+h1{font:800 clamp(30px,5vw,46px)/1.05 Archivo,"Noto Sans JP",sans-serif;margin:0 0 8px;text-wrap:balance;letter-spacing:-.01em}
+.sub{margin:0;max-width:36em;opacity:.85}
+.load,.row,.transport{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.btn{min-height:44px;padding:0 18px;border-radius:999px;border:1px solid var(--line);background:transparent;color:inherit;font:700 15px "Noto Sans JP",sans-serif;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.deck .btn{border-color:rgba(255,255,255,.45)}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+.btn:disabled{opacity:.45;cursor:default}
+.btn:focus-visible,input:focus-visible,select:focus-visible,.seg button:focus-visible{outline:3px solid #ffd25e;outline-offset:2px}
+.fig{position:relative;min-height:clamp(220px,34vw,360px);background:rgba(0,0,0,.18);border-radius:14px;overflow:hidden}
+.fig>canvas{position:absolute;inset:0;width:100%;height:100%}
+.legend{position:absolute;right:14px;top:10px;display:flex;gap:14px;font-size:13px}
+.legend span::before{content:"";display:inline-block;width:14px;height:3px;margin-right:6px;vertical-align:middle;background:rgba(255,255,255,.7)}
+.legend .lb::before{background:var(--acc);height:6px}
+.empty[hidden]{display:none}.empty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:20px;opacity:.8}
+#wave{display:block;width:100%;height:58px;margin:12px 0 16px;cursor:pointer;border-radius:10px;background:rgba(0,0,0,.14);touch-action:manipulation}
+.seg{display:inline-flex;border:1px solid rgba(255,255,255,.45);border-radius:999px;padding:3px}
+.seg button{min-height:38px;padding:0 16px;border:0;border-radius:999px;background:transparent;color:#fff;font:700 14px "Noto Sans JP",sans-serif;cursor:pointer}
+.seg button[aria-pressed=true]{background:#fff;color:var(--deck)}
+.chk{display:inline-flex;gap:8px;align-items:center;font-size:14px;min-height:44px}
+.chk input{width:20px;height:20px;accent-color:var(--acc)}
+.status{font-size:14px;opacity:.85}
+.meters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:18px}
+.meters div{background:rgba(0,0,0,.18);border-radius:12px;padding:12px 14px}
+.meters b{display:block;font:800 clamp(22px,3.4vw,32px)/1.1 Archivo,sans-serif;font-variant-numeric:tabular-nums;white-space:nowrap}
+.meters span{font-size:13px;opacity:.8}
+.grid{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:20px;max-width:1240px;margin:0 auto}
+.col{display:grid;gap:20px;align-content:start}
+.mods{grid-template-columns:repeat(2,minmax(0,1fr))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px}
+h2{font:700 19px/1.3 "Noto Sans JP",sans-serif;margin:0 0 6px}
+.note{color:var(--mut);font-size:14px;margin:0 0 14px}
+.ctl{display:grid;grid-template-columns:1fr auto;gap:0 10px;margin-top:10px}
+.ctl label{font-size:15px}
+.ctl output{font:600 15px Archivo,sans-serif;font-variant-numeric:tabular-nums;white-space:nowrap}
+input[type=range]{grid-column:1/-1;width:100%;height:30px;accent-color:var(--acc);margin:2px 0 0}
+.diag{margin:6px 0 16px;padding:0;list-style:none;display:grid;gap:8px}
+.diag li{background:var(--soft);border-radius:10px;padding:10px 12px;font-size:15px}
+.diag b{font-family:Archivo,"Noto Sans JP",sans-serif}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips .btn{font-size:14px}
+.chips .btn[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+select{font:16px "Noto Sans JP",sans-serif;min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:0 10px}
+footer{max-width:1240px;margin:0 auto;padding:0 max(5vw,16px) 40px;color:var(--mut);font-size:14px}
+@media(max-width:900px){.grid{grid-template-columns:1fr}}
+@media(max-width:600px){.mods{grid-template-columns:1fr}.meters{grid-template-columns:repeat(2,minmax(0,1fr))}.legend{left:12px;right:auto}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header class="band deck"><div class="wrap">
+  <div class="top">
+    <div><h1>AI音源マスタリング</h1><p class="sub">MP3・WAVのこもりや、AI生成音源に多い高域のシャリつきを整えて、配信向けの音量で書き出します。処理はすべてこのブラウザ内で行われます。</p></div>
+    <div class="load"><label class="btn pri" for="file" tabindex="0" id="openlbl">音源を開く</label><input id="file" type="file" accept="audio/*,.mp3,.wav,.m4a,.flac,.aac" hidden><button id="demo" class="btn">デモ音源で試す</button></div>
+  </div>
+  <div class="fig" id="specbox"><canvas id="spec"></canvas><div class="legend"><span class="la">元音源</span><span class="lb">処理後</span></div><div id="empty" class="empty">音源を開くか、ここにドロップしてください。<br>処理前後のスペクトルを重ねて表示します。</div></div>
+  <canvas id="wave" aria-label="曲全体の波形。タップした位置をプレビュー区間にします"></canvas>
+  <div class="transport">
+    <button id="play" class="btn pri" disabled>▶ 再生</button>
+    <div class="seg" role="group" aria-label="比較"><button id="ba" aria-pressed="false">A 元音源</button><button id="bb" aria-pressed="true">B 処理後</button></div>
+    <label class="chk"><input type="checkbox" id="match" checked>音量を揃えて比較</label>
+    <span id="status" class="status" aria-live="polite"></span>
+  </div>
+  <div class="meters">
+    <div><b id="mIn">—</b><span>入力 LUFS</span></div>
+    <div><b id="mOut">—</b><span>出力 LUFS（予測）</span></div>
+    <div><b id="mPk">—</b><span>出力ピーク dBFS</span></div>
+    <div><b id="mRate">—</b><span>サンプルレート</span></div>
+  </div>
+</div></header>
+<main class="band grid">
+  <section class="col">
+    <div class="card"><h2>自動診断</h2><ul id="diag" class="diag"><li>音源を開くと、こもり・高域の欠け・ステレオ感・音量を測って設定を提案します。</li></ul><button id="auto" class="btn pri" disabled>診断結果を設定に反映</button></div>
+    <div class="card"><h2>プリセット</h2><p class="note">出発点を選んでから、右のつまみで追い込みます。</p><div id="presets" class="chips"></div></div>
+    <div class="card"><h2>書き出し</h2><p class="note">全曲を同じ設定で処理し、WAVで保存します（Claude上で開いた場合は、保存できる形式の都合でZIPに入れて保存します）。</p><div class="row"><select id="bits" aria-label="ビット深度"><option value="24">WAV 24bit</option><option value="16">WAV 16bit（ディザ付き）</option></select><button id="export" class="btn pri" disabled>書き出す</button></div><p id="exmsg" class="note" style="margin:12px 0 0" aria-live="polite"></p></div>
+  </section>
+  <section class="col mods" id="mods"></section>
+</main>
+<footer>プレビューは波形上の明るい24秒区間をループ再生します（波形をタップで移動）。書き出しは全曲を測定し直して、目標ラウドネスとピーク上限に精密に合わせます。MP3で失われた16kHz以上の帯域は復元できませんが、空気感の補正で聴感上の抜けは改善できます。</footer>
+<script>
+{
+const $=s=>document.querySelector(s);
+const SEG=24;
+const P=[['mudF','こもり帯域','mid',150,600,10,'Hz',280],['mud','こもりカット','mid',0,8,0.5,'dB',3],['pres','明瞭感（3kHz）','mid',-4,4,0.5,'dB',0.5],
+['hsF','シャリつき帯域','high',3000,10000,100,'Hz',6000],['hs','シャリつき抑制','high',0,100,1,'%',40],['air','空気感（12kHz）','high',-3,6,0.5,'dB',2],
+['hpf','ローカット','low',10,80,1,'Hz',28],['low','低域（100Hz）','low',-6,6,0.5,'dB',0],
+['mono','低域モノ化','stereo',0,250,10,'Hz',120],['width','ステレオ幅','stereo',0.5,1.6,0.05,'×',1.05],
+['sat','倍音（温かみ）','dyn',0,100,1,'%',12],['glue','グルーコンプ','dyn',0,100,1,'%',25],
+['lufs','目標ラウドネス','loud',-18,-8,0.5,'LUFS',-14],['ceil','ピーク上限','loud',-3,-0.1,0.1,'dB',-1]];
+const G={mid:['こもり・中域','AI音源は200〜400Hzに音が溜まりがち。ここを削ると霧が晴れたように抜けます。'],high:['高域・AIのシャリつき','高域のジュワジュワした金属的なざらつきを、鳴った瞬間だけ抑えます。そのうえで上の空気感を足します。'],low:['低域','聴こえない超低域のゴロつきを切って、土台を整えます。'],stereo:['ステレオ','低音をセンターに集めて締め、全体の広がりを調整します。'],dyn:['質感・ダイナミクス','まとまりと温かみを足して、デジタルっぽい硬さを和らげます。'],loud:['ラウドネス','配信の基準は −14 LUFS 前後。上げすぎると音が潰れます。']};
+const PR={'AIこもり除去（標準）':{hpf:28,low:0,mono:120,width:1.08,mudF:280,mud:3.5,pres:0.5,hsF:6000,hs:45,air:2.5,sat:12,glue:25,lufs:-14,ceil:-1},'ナチュラル':{hpf:25,low:0,mono:100,width:1,mudF:250,mud:2,pres:0,hsF:7000,hs:25,air:1.5,sat:5,glue:15,lufs:-14,ceil:-1},'ボーカルを前に':{hpf:30,low:-1,mono:140,width:1.05,mudF:320,mud:4,pres:2,hsF:6500,hs:50,air:2,sat:10,glue:30,lufs:-14,ceil:-1},'強めの音圧':{hpf:30,low:1,mono:150,width:1.1,mudF:280,mud:3,pres:1,hsF:6000,hs:55,air:2,sat:30,glue:50,lufs:-10,ceil:-0.8},'音量合わせのみ':{hpf:10,low:0,mono:0,width:1,mudF:280,mud:0,pres:0,hsF:6000,hs:0,air:0,sat:0,glue:0,lufs:-14,ceil:-1}};
+let p={};P.forEach(q=>p[q[0]]=q[7]);
+try{Object.assign(p,JSON.parse(localStorage.getItem('aimaster.p')||'{}'))}catch(e){}
+/* ---------- DSP ---------- */
+function bq(t,f,fs,g=0,Q=0.7071){const w=2*Math.PI*Math.min(f,fs*0.45)/fs,c=Math.cos(w),s=Math.sin(w),A=10**(g/40),al=s/(2*Q),q=2*Math.sqrt(A)*al;let b0,b1,b2,a0,a1,a2;
+if(t==='lp'){b0=(1-c)/2;b1=1-c;b2=b0;a0=1+al;a1=-2*c;a2=1-al}
+else if(t==='hp'){b0=(1+c)/2;b1=-(1+c);b2=b0;a0=1+al;a1=-2*c;a2=1-al}
+else if(t==='pk'){b0=1+al*A;b1=-2*c;b2=1-al*A;a0=1+al/A;a1=-2*c;a2=1-al/A}
+else if(t==='ls'){b0=A*((A+1)-(A-1)*c+q);b1=2*A*((A-1)-(A+1)*c);b2=A*((A+1)-(A-1)*c-q);a0=(A+1)+(A-1)*c+q;a1=-2*((A-1)+(A+1)*c);a2=(A+1)+(A-1)*c-q}
+else{b0=A*((A+1)+(A-1)*c+q);b1=-2*A*((A-1)+(A+1)*c);b2=A*((A+1)+(A-1)*c-q);a0=(A+1)-(A-1)*c+q;a1=2*((A-1)-(A+1)*c);a2=(A+1)-(A-1)*c-q}
+return[b0/a0,b1/a0,b2/a0,a1/a0,a2/a0]}
+function run(x,k){const[b0,b1,b2,a1,a2]=k;let z1=0,z2=0;for(let i=0;i<x.length;i++){const v=x[i],y=b0*v+z1;z1=b1*v-a1*y+z2;z2=b2*v-a2*y;x[i]=y}return x}
+function dyn(L,R,fs,thr,ratio,att,rel,pk){const aA=Math.exp(-1/(att*fs)),aR=Math.exp(-1/(rel*fs)),sl=1-1/ratio,K=6,m=pk?20:10;let e=0;
+for(let i=0;i<L.length;i++){const l=L[i],r=R[i],v=pk?Math.max(Math.abs(l),Math.abs(r)):(l*l+r*r)*0.5;e=v>e?aA*e+(1-aA)*v:aR*e+(1-aR)*v;
+const d=m*Math.log10(e+1e-12)-thr;let gr=0;if(d>K/2)gr=sl*d;else if(d>-K/2)gr=sl*(d+K/2)**2/(2*K);if(gr>0){const g=10**(-gr/20);L[i]=l*g;R[i]=r*g}}}
+function chainPre(src,fs,p){const L=Float32Array.from(src[0]),R=Float32Array.from(src[1]),n=L.length;
+for(const k of[bq('hp',p.hpf,fs),bq('ls',100,fs,p.low),bq('pk',p.mudF,fs,-p.mud,1.1),bq('pk',3000,fs,p.pres,0.8)]){run(L,k);run(R,k)}
+if(p.hs>0){const hl=Float32Array.from(L),hr=Float32Array.from(R),lp=bq('lp',p.hsF,fs),hp=bq('hp',p.hsF,fs);
+run(run(L,lp),lp);run(run(R,lp),lp);run(run(hl,hp),hp);run(run(hr,hp),hp);
+dyn(hl,hr,fs,S.hi(p.hsF)+8-p.hs*0.14,1+p.hs*0.05,0.002,0.06,true);for(let i=0;i<n;i++){L[i]+=hl[i];R[i]+=hr[i]}}
+if(p.air){const k=bq('hs',12000,fs,p.air);run(L,k);run(R,k)}
+if(p.sat>0){const d=1+p.sat*0.015;for(let i=0;i<n;i++){L[i]=Math.tanh(d*L[i])/d;R[i]=Math.tanh(d*R[i])/d}}
+if(p.width!==1||p.mono>0){const Sd=new Float32Array(n);for(let i=0;i<n;i++){Sd[i]=(L[i]-R[i])/2;L[i]=(L[i]+R[i])/2}
+if(p.mono>0){const k=bq('hp',p.mono,fs);run(run(Sd,k),k)}for(let i=0;i<n;i++){const s=Sd[i]*p.width;R[i]=L[i]-s;L[i]+=s}}
+if(p.glue>0)dyn(L,R,fs,S.inL+3-p.glue*0.1,1.3+p.glue*0.027,0.015,0.2,false);
+return[L,R]}
+function limit(L0,R0,fs,gain,ceil){const n=L0.length,c=10**(ceil/20),La=Math.max(1,Math.round(fs*0.005)),L=new Float32Array(n),R=new Float32Array(n),g=new Float32Array(n),h=new Float32Array(n),dq=new Int32Array(n);
+for(let i=0;i<n;i++){L[i]=L0[i]*gain;R[i]=R0[i]*gain;const pk=Math.max(Math.abs(L[i]),Math.abs(R[i]));g[i]=pk>c?c/pk:1}
+let hd=0,tl=0;for(let i=n-1;i>=0;i--){while(tl>hd&&g[dq[tl-1]]>=g[i])tl--;dq[tl++]=i;while(dq[hd]>i+La)hd++;h[i]=g[dq[hd]]}
+const r=Math.exp(-1/(0.08*fs));let s=1;for(let i=0;i<n;i++){s=h[i]<s?h[i]:r*s+(1-r)*h[i];h[i]=s}
+let sum=La;for(let i=0;i<n;i++){sum+=h[i]-(i>=La?h[i-La]:1);const b=sum/La,lv=L[i]*b,rv=R[i]*b;L[i]=lv>c?c:lv<-c?-c:lv;R[i]=rv>c?c:rv<-c?-c:rv}
+return[L,R]}
+function lufs(ch,fs){const k1=bq('hs',1681.974,fs,3.99984,0.70718),k2=bq('hp',38.135,fs,0,0.50033),hop=Math.round(fs*0.1),nh=Math.floor(ch[0].length/hop);if(nh<4)return-70;const q=new Float64Array(nh);
+for(const c of ch){const x=Float32Array.from(c.subarray(0,nh*hop));run(x,k1);run(x,k2);for(let j=0;j<nh;j++){let s=0;for(let i=j*hop,e=i+hop;i<e;i++)s+=x[i]*x[i];q[j]+=s}}
+const lv=z=>-0.691+10*Math.log10(z+1e-20),bl=[];for(let j=0;j+4<=nh;j++)bl.push((q[j]+q[j+1]+q[j+2]+q[j+3])/(4*hop));
+let g=bl.filter(z=>lv(z)>-70);if(!g.length)return-70;const avg=a=>a.reduce((x,y)=>x+y,0)/a.length,rt=lv(avg(g))-10;g=g.filter(z=>lv(z)>rt);return lv(avg(g))}
+function peakDb(ch){let m=0;for(const c of ch)for(let i=0;i<c.length;i++){const v=Math.abs(c[i]);if(v>m)m=v}return 20*Math.log10(m+1e-12)}
+function master(src,fs,p,off){const pre=chainPre(src,fs,p);let m=lufs(pre,fs)+off;if(m<-69)m=-30;let g=Math.min(16,10**((p.lufs-m)/20)),out=limit(pre[0],pre[1],fs,g,p.ceil);
+g=Math.min(16,g*10**((p.lufs-(lufs(out,fs)+off))/20));out=limit(pre[0],pre[1],fs,g,p.ceil);return{out,l:lufs(out,fs)+off,pk:peakDb(out)}}
+function fft(re,im){const n=re.length;for(let i=1,j=0;i<n;i++){let b=n>>1;for(;j&b;b>>=1)j^=b;j^=b;if(i<j){let t=re[i];re[i]=re[j];re[j]=t;t=im[i];im[i]=im[j];im[j]=t}}
+for(let len=2;len<=n;len<<=1){const a=-2*Math.PI/len,wr=Math.cos(a),wi=Math.sin(a),hl=len>>1;for(let i=0;i<n;i+=len){let cr=1,ci=0;for(let j=0;j<hl;j++){const k=i+j,l=k+hl,tr=re[l]*cr-im[l]*ci,ti=re[l]*ci+im[l]*cr;re[l]=re[k]-tr;im[l]=im[k]-ti;re[k]+=tr;im[k]+=ti;const t=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=t}}}}
+function avgSpec(L,R,frames){const N=4096,acc=new Float64Array(N/2),re=new Float64Array(N),im=new Float64Array(N),hop=Math.max(1,Math.floor((L.length-N)/frames));let c=0;
+for(let s=0;s+N<=L.length&&c<frames;s+=hop,c++){for(let i=0;i<N;i++){re[i]=(L[s+i]+R[s+i])*0.5*(0.5-0.5*Math.cos(2*Math.PI*i/N));im[i]=0}fft(re,im);for(let k=0;k<N/2;k++)acc[k]+=re[k]*re[k]+im[k]*im[k]}
+const o=new Float32Array(N/2);for(let k=0;k<N/2;k++)o[k]=10*Math.log10(acc[k]/Math.max(c,1)/(N*N/16)+1e-20);return o}
+/* ---------- files ---------- */
+function wav(L,R,fs,bits){const n=L.length,ba=bits/4,u=new Uint8Array(44+n*ba),v=new DataView(u.buffer),ws=(o,s)=>{for(let i=0;i<4;i++)u[o+i]=s.charCodeAt(i)};
+ws(0,'RIFF');v.setUint32(4,36+n*ba,true);ws(8,'WAVE');ws(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,2,true);v.setUint32(24,fs,true);v.setUint32(28,fs*ba,true);v.setUint16(32,ba,true);v.setUint16(34,bits,true);ws(36,'data');v.setUint32(40,n*ba,true);
+let o=44;for(let i=0;i<n;i++)for(const c of[L,R]){if(bits===16){const s=Math.max(-32768,Math.min(32767,Math.round(c[i]*32767+Math.random()-Math.random())));v.setInt16(o,s,true);o+=2}else{const s=Math.round(Math.max(-1,Math.min(1,c[i]))*8388607);u[o]=s&255;u[o+1]=(s>>8)&255;u[o+2]=(s>>16)&255;o+=3}}return u}
+const CT=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;CT[n]=c>>>0}
+function zip(name,d){const nm=new TextEncoder().encode(name);let c=0xFFFFFFFF;for(let i=0;i<d.length;i++)c=CT[(c^d[i])&255]^(c>>>8);c=(c^0xFFFFFFFF)>>>0;const sz=d.length;
+const lh=new DataView(new ArrayBuffer(30)),cd=new DataView(new ArrayBuffer(46)),eo=new DataView(new ArrayBuffer(22));
+[[0,0x04034b50,4],[4,20,2],[6,0x800,2],[12,0x21,2],[14,c,4],[18,sz,4],[22,sz,4],[26,nm.length,2]].forEach(([o,x,w])=>w===4?lh.setUint32(o,x,true):lh.setUint16(o,x,true));
+[[0,0x02014b50,4],[4,20,2],[6,20,2],[8,0x800,2],[14,0x21,2],[16,c,4],[20,sz,4],[24,sz,4],[28,nm.length,2]].forEach(([o,x,w])=>w===4?cd.setUint32(o,x,true):cd.setUint16(o,x,true));
+eo.setUint32(0,0x06054b50,true);eo.setUint16(8,1,true);eo.setUint16(10,1,true);eo.setUint32(12,46+nm.length,true);eo.setUint32(16,30+nm.length+sz,true);
+return new Blob([lh,nm,d,cd,nm,eo],{type:'application/zip'})}
+/* ---------- state & audio ---------- */
+let S=null,ctx=null,AN=null,srcs=[],playing=false,t0=0,useB=true,timer=0,top=-20,dl=null;
+try{window.claude.use('downloads').then(d=>{dl=d}).catch(()=>{})}catch(e){}
+const st=t=>{$('#status').textContent=t};
+function ensureCtx(){if(ctx)return;ctx=new (window.AudioContext||window.webkitAudioContext)();const mk=()=>{const a=ctx.createAnalyser();a.fftSize=8192;a.smoothingTimeConstant=0.85;return a};
+AN={a:mk(),b:mk(),ga:ctx.createGain(),gb:ctx.createGain()};AN.a.connect(AN.ga).connect(ctx.destination);AN.b.connect(AN.gb).connect(ctx.destination);AN.fa=new Float32Array(4096);AN.fb=new Float32Array(4096)}
+function mkBuf(ch){const b=ctx.createBuffer(2,ch[0].length,S.fs);b.copyToChannel(ch[0],0);b.copyToChannel(ch[1],1);return b}
+function stopSrc(){srcs.forEach(s=>{try{s.stop()}catch(e){}});srcs=[]}
+function pos(){const d=S.bufA.duration;return playing?(((ctx.currentTime-t0)%d)+d)%d:0}
+function startSrc(at){stopSrc();const sa=ctx.createBufferSource(),sb=ctx.createBufferSource();sa.buffer=S.bufA;sb.buffer=S.bufB;sa.loop=sb.loop=true;sa.connect(AN.a);sb.connect(AN.b);const t=ctx.currentTime+0.03;sa.start(t,at);sb.start(t,at);srcs=[sa,sb];t0=t-at}
+function gains(){if(!AN||!S||S.outSeg==null)return;const t=ctx.currentTime,ga=$('#match').checked?10**((S.outSeg-S.segIn)/20):1;AN.ga.gain.setTargetAtTime(useB?0:ga,t,0.015);AN.gb.gain.setTargetAtTime(useB?1:0,t,0.015)}
+function init(L,R,fs,name){if(playing)togglePlay();const n=L.length;S={L,R,fs,n,dur:n/fs,name,hiC:{}};
+S.hi=f=>{const k=Math.round(f/100)*100;if(S.hiC[k]==null){const h=bq('hp',k,fs);let e=0;for(const c of[L,R]){const x=Float32Array.from(c);run(run(x,h),h);for(let i=0;i<n;i++)e+=x[i]*x[i]}S.hiC[k]=10*Math.log10(e/(2*n)+1e-20)}return S.hiC[k]};
+S.inL=lufs([L,R],fs);S.inPk=peakDb([L,R]);
+const W=900,pk=new Float32Array(W);for(let i=0;i<n;i++){const j=Math.floor(i/n*W),v=Math.abs(L[i]+R[i])/2;if(v>pk[j])pk[j]=v}S.peaks=pk;
+const blk=fs,en=[];for(let i=0;i+blk<=n;i+=blk){let e=0;for(let j=i;j<i+blk;j+=4)e+=L[j]*L[j]+R[j]*R[j];en.push(e)}
+const w=Math.min(SEG,en.length);let best=0,bs=-1,run2=0;for(let i=0;i<en.length;i++){run2+=en[i]-(i>=w?en[i-w]:0);if(i>=w-1&&run2>bs){bs=run2;best=i-w+1}}S.seg0=S.dur>SEG?best:0;
+diagnose();$('#empty').hidden=true;['#play','#auto','#export'].forEach(s=>$(s).disabled=false);
+$('#mIn').textContent=S.inL.toFixed(1);$('#mRate').textContent=(fs/1000).toFixed(1)+'k';renderPreview()}
+function renderPreview(){if(!S)return;const fs=S.fs,a=Math.floor(S.seg0*fs),b=Math.min(S.n,a+Math.floor(SEG*fs)),seg=[S.L.subarray(a,b),S.R.subarray(a,b)];
+if(S.segKey!==a){S.segKey=a;S.segIn=lufs(seg,fs);S.specA=avgSpec(seg[0],seg[1],60);S.bufA=mkBuf(seg)}
+const off=S.inL-S.segIn,r=master(seg,fs,p,off);S.bufB=mkBuf(r.out);S.specB=avgSpec(r.out[0],r.out[1],60);S.outSeg=r.l-off;
+$('#mOut').textContent=r.l.toFixed(1);$('#mPk').textContent=r.pk.toFixed(1);st('');
+if(playing){const at=pos();startSrc(at)}gains();if(!playing){drawSpec(S.specA,S.specB,fs/4096,true);drawWave()}}
+function sched(){if(!S)return;clearTimeout(timer);st('プレビュー更新中…');timer=setTimeout(renderPreview,260)}
+/* ---------- diagnosis ---------- */
+let sug=null;
+function diagnose(){const{L,R,fs,n}=S,sp=avgSpec(L,R,160),bh=fs/4096,C=[25,31.5,40,50,63,80,100,125,160,200,250,315,400,500,630,800,1000,1250,1600,2000,2500,3150,4000,5000,6300,8000,10000,12500,16000];
+const db=C.map(f=>{let s=0;for(let i=Math.max(1,Math.floor(f*2**(-1/6)/bh));i<=Math.ceil(f*2**(1/6)/bh)&&i<sp.length;i++)s+=10**(sp[i]/10);return 10*Math.log10(s+1e-20)});
+const fit=C.map((f,i)=>[Math.log2(f),db[i]]).filter((x,i)=>C[i]>=63&&C[i]<=8000),mx=fit.reduce((a,x)=>a+x[0],0)/fit.length,my=fit.reduce((a,x)=>a+x[1],0)/fit.length;
+const sl=fit.reduce((a,x)=>a+(x[0]-mx)*(x[1]-my),0)/fit.reduce((a,x)=>a+(x[0]-mx)**2,0),res=C.map((f,i)=>db[i]-(my+sl*(Math.log2(f)-mx))),rm=fs2=>{const v=fs2.map(f=>res[C.indexOf(f)]);return v.reduce((a,b)=>a+b,0)/v.length};
+const mud=rm([200,250,315,400]),pres=rm([2500,3150,4000,5000]),hi=rm([10000,12500]),sub=rm([25,31.5,40]);let mf=200,mv=-99;[160,200,250,315,400,500].forEach(f=>{const v=res[C.indexOf(f)];if(v>mv){mv=v;mf=f}});
+let ref=-200;for(let i=Math.floor(1000/bh);i<4000/bh;i++)ref=Math.max(ref,sp[i]);let cut=0;for(let i=sp.length-1;i>0;i--)if(sp[i]>ref-70){cut=i*bh;break}
+let em=0,es=0;for(let i=0;i<n;i+=2){const m=L[i]+R[i],s=L[i]-R[i];em+=m*m;es+=s*s}const ms=10*Math.log10(es/(em+1e-20)+1e-20);
+const cl=(v,a,b)=>Math.max(a,Math.min(b,v)),h5=v=>Math.round(v*2)/2;
+sug={...p,mudF:mf,mud:cl(h5(1.5+mud*0.9),0,6),pres:pres>2?-1.5:pres<-2?1.5:0.5,hs:cl(Math.round(35+Math.max(0,pres)*6+(hi>-2?10:0)),20,70),air:cl(h5(-(hi+3)*0.5),0,4),hpf:sub>3?35:25,mono:120,width:ms<-18?1.15:ms>-7?0.95:1.05};
+const sg=v=>(v>0?'+':'')+v.toFixed(1);const li=[
+`こもり：<b>${mf}Hz</b>付近が周囲より <b>${sg(mud)} dB</b>。${mud>1.5?'こもり気味です。':'目立った溜まりはありません。'}`,
+`中高域（2.5〜5kHz）：<b>${sg(pres)} dB</b>。${pres>2?'耳に刺さりやすい傾向。':pres<-2?'少し引っ込んでいます。':'ほぼ自然なバランス。'}`,
+`高域（10〜12kHz）：<b>${sg(hi)} dB</b>。${hi<-6?'暗めで抜けが弱いです。':hi>-1?'明るめ。シャリつきに注意。':'標準的。'}`,
+cut&&cut<17500?`上限：約 <b>${(cut/1000).toFixed(1)} kHz</b> より上がほぼ無音（MP3やAI生成で多い特徴）。`:`上限：<b>${(Math.min(cut,fs/2)/1000).toFixed(1)} kHz</b> 付近まで成分があります。`,
+`ステレオ：サイド成分 <b>${ms.toFixed(1)} dB</b>。${ms<-18?'やや狭め。':ms>-7?'広すぎて位相がにじみ気味。':'標準的。'}`,
+`音量：<b>${S.inL.toFixed(1)} LUFS</b>、ピーク <b>${S.inPk.toFixed(1)} dBFS</b>。`];
+$('#diag').innerHTML=li.map(x=>`<li>${x}</li>`).join('')}
+/* ---------- drawing ---------- */
+function prep(cv){const W=cv.clientWidth,H=cv.clientHeight,d=devicePixelRatio||1;cv.width=W*d;cv.height=H*d;const g=cv.getContext('2d');g.scale(d,d);return[g,W,H]}
+function drawSpec(a,b,bh,fixTop){const[g,W,H]=prep($('#spec'));if(!a)return;const fx=f=>Math.log(f/20)/Math.log(1000)*W;
+const col=arr=>{const o=[];for(let x=0;x<=W;x+=2){const i1=Math.floor(20*1000**(x/W)/bh),i2=Math.max(i1+1,Math.ceil(20*1000**((x+2)/W)/bh));let s=0,c=0;for(let i=Math.max(1,i1);i<i2&&i<arr.length;i++){s+=10**(arr[i]/10);c++}o.push(c?10*Math.log10(s/c+1e-20):-200)}return o};
+const A=col(a),B=col(b),mx=Math.max(...A,...B);top=fixTop?mx+12:top+(mx+12-top)*0.08;const y=v=>(top-v)/80*H;
+g.font='12px "Noto Sans JP",sans-serif';g.textBaseline='bottom';[50,100,200,500,1000,2000,5000,10000].forEach(f=>{if(W<520&&[200,2000].includes(f))return;const x=fx(f);g.fillStyle='rgba(255,255,255,.13)';g.fillRect(x,0,1,H);g.fillStyle='rgba(255,255,255,.6)';g.fillText(f>=1000?f/1000+'k':f,x+4,H-6)});
+g.beginPath();g.moveTo(0,H);B.forEach((v,i)=>g.lineTo(i*2,y(v)));g.lineTo(W,H);g.closePath();g.fillStyle='rgba(255,91,69,.32)';g.fill();
+g.beginPath();B.forEach((v,i)=>g.lineTo(i*2,y(v)));g.strokeStyle='#ff5b45';g.lineWidth=2.5;g.stroke();
+g.beginPath();A.forEach((v,i)=>g.lineTo(i*2,y(v)));g.strokeStyle='rgba(255,255,255,.75)';g.lineWidth=1.5;g.stroke()}
+function drawWave(){const[g,W,H]=prep($('#wave'));if(!S)return;const pk=S.peaks,x0=S.seg0/S.dur*W,x1=Math.min(W,(S.seg0+SEG)/S.dur*W);
+g.fillStyle='rgba(255,255,255,.16)';g.fillRect(x0,0,x1-x0,H);for(let x=0;x<W;x++){const v=pk[Math.floor(x/W*pk.length)]*H*0.9;g.fillStyle=x>=x0&&x<=x1?'rgba(255,255,255,.95)':'rgba(255,255,255,.4)';g.fillRect(x,(H-v)/2,1,Math.max(1,v))}
+if(playing){const px=x0+pos()/S.dur*W;g.fillStyle='#ff5b45';g.fillRect(px-1,0,3,H)}}
+function loop(){if(!playing)return;AN.a.getFloatFrequencyData(AN.fa);AN.b.getFloatFrequencyData(AN.fb);drawSpec(AN.fa,AN.fb,ctx.sampleRate/8192,false);drawWave();requestAnimationFrame(loop)}
+/* ---------- UI ---------- */
+const fmt=(q,v)=>q[0]==='mono'&&v==0?'オフ':q[6]==='Hz'&&v>=1000?(v/1000).toFixed(1)+' kHz':q[6]==='×'?(+v).toFixed(2)+'×':(q[6]==='dB'&&v>0?'+':'')+(+v).toFixed(q[5]<1?1:0)+' '+q[6];
+$('#mods').innerHTML=Object.entries(G).map(([k,[t,h]])=>`<div class="card"><h2>${t}</h2><p class="note">${h}</p>${P.filter(q=>q[2]===k).map(q=>`<div class="ctl"><label for="p-${q[0]}">${q[1]}</label><output id="o-${q[0]}"></output><input type="range" id="p-${q[0]}" min="${q[3]}" max="${q[4]}" step="${q[5]}"></div>`).join('')}</div>`).join('');
+function show(){P.forEach(q=>{$('#p-'+q[0]).value=p[q[0]];$('#o-'+q[0]).textContent=fmt(q,p[q[0]])});const cur=JSON.stringify(p);document.querySelectorAll('#presets .btn').forEach(b=>b.setAttribute('aria-pressed',JSON.stringify({...p,...PR[b.dataset.k]})===cur))}
+function save(){try{localStorage.setItem('aimaster.p',JSON.stringify(p))}catch(e){}}
+P.forEach(q=>$('#p-'+q[0]).addEventListener('input',e=>{p[q[0]]=+e.target.value;show();save();sched()}));
+$('#presets').innerHTML=Object.keys(PR).map(k=>`<button class="btn" data-k="${k}" aria-pressed="false">${k}</button>`).join('');
+$('#presets').addEventListener('click',e=>{const b=e.target.closest('.btn');if(!b)return;Object.assign(p,PR[b.dataset.k]);show();save();sched()});
+$('#auto').onclick=()=>{if(!sug)return;Object.assign(p,sug);show();save();sched();st('診断結果を反映しました')};
+async function loadFile(f){if(!f)return;ensureCtx();st('読み込み中…');try{const b=await ctx.decodeAudioData(await f.arrayBuffer());const L=b.getChannelData(0);st('解析中…');setTimeout(()=>init(L,b.numberOfChannels>1?b.getChannelData(1):L,b.sampleRate,f.name),20)}catch(e){st('この形式は読み込めませんでした')}}
+$('#file').onchange=e=>loadFile(e.target.files[0]);
+$('#openlbl').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('#file').click()}};
+const box=$('#specbox');box.ondragover=e=>e.preventDefault();box.ondrop=e=>{e.preventDefault();loadFile(e.dataTransfer.files[0])};
+$('#demo').onclick=()=>{ensureCtx();st('デモ音源を生成中…');setTimeout(()=>{const fs=ctx.sampleRate,n=fs*16,L=new Float32Array(n),R=new Float32Array(n),ch=[[220,277.2,329.6],[196,246.9,293.7],[174.6,220,261.6],[196,246.9,311.1]],ph=[0,0,0];
+for(let i=0;i<n;i++){const t=i/fs,c=ch[Math.floor(t/2)%4],bt=t%0.5,ht=(t+0.25)%0.5;let s=0;for(let j=0;j<3;j++){ph[j]=(ph[j]+c[j]/fs)%1;s+=(ph[j]*2-1)*0.12}
+const bass=Math.sin(Math.PI*c[0]*t)*0.25,kick=Math.sin(2*Math.PI*(50+120*Math.exp(-bt*30))*bt)*Math.exp(-bt*8)*0.6,hat=(Math.random()*2-1)*Math.exp(-ht*40)*0.12;L[i]=s+bass+kick+hat;R[i]=s*0.9+bass+kick+hat*0.7}
+for(const k of[bq('pk',300,fs,6,1),bq('pk',7000,fs,5,1.5),bq('lp',15000,fs),bq('lp',15000,fs)]){run(L,k);run(R,k)}let m=0;for(let i=0;i<n;i++)m=Math.max(m,Math.abs(L[i]),Math.abs(R[i]));for(let i=0;i<n;i++){L[i]*=0.9/m;R[i]*=0.9/m}
+init(L,R,fs,'demo.wav')},20)};
+function togglePlay(){if(!S)return;ensureCtx();if(playing){stopSrc();playing=false;$('#play').textContent='▶ 再生';drawSpec(S.specA,S.specB,S.fs/4096,true);drawWave();return}
+ctx.resume();startSrc(0);playing=true;gains();$('#play').textContent='❚❚ 停止';requestAnimationFrame(loop)}
+$('#play').onclick=togglePlay;
+const ab=b=>{useB=b;$('#ba').setAttribute('aria-pressed',!b);$('#bb').setAttribute('aria-pressed',b);gains()};$('#ba').onclick=()=>ab(false);$('#bb').onclick=()=>ab(true);$('#match').onchange=gains;
+$('#wave').onclick=e=>{if(!S||S.dur<=SEG)return;const r=e.currentTarget.getBoundingClientRect(),t=(e.clientX-r.left)/r.width*S.dur;S.seg0=Math.max(0,Math.min(S.dur-SEG,t-SEG/2));drawWave();sched()};
+const msg=t=>{$('#exmsg').textContent=t};
+$('#export').onclick=async()=>{if(!S)return;const btn=$('#export');btn.disabled=true;msg('全曲を処理中…（曲の長さによって数秒〜数十秒）');await new Promise(r=>setTimeout(r,60));
+try{const r=master([S.L,S.R],S.fs,p,0),name=S.name.replace(/\.[^.]+$/,'')+'_master',w=wav(r.out[0],r.out[1],S.fs,+$('#bits').value),z=dl?zip(name+'.wav',w):null,info=`${r.l.toFixed(1)} LUFS／ピーク ${r.pk.toFixed(1)} dBFS／${(S.fs/1000).toFixed(1)}kHz`;
+if(dl){try{await dl.save({filename:name+'.zip',data:z});msg('保存しました：'+info)}catch(e){msg(e&&e.code==='declined'?'保存をキャンセルしました':'保存できませんでした（'+((e&&(e.message||e.code))||'不明')+'）')}}
+else{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([w],{type:'audio/wav'}));a.download=name+'.wav';document.body.appendChild(a);a.click();a.remove();msg('保存しました：'+info)}}
+catch(e){msg('エラー：'+e.message)}finally{btn.disabled=false}};
+const ro=new ResizeObserver(()=>{if(S&&!playing){drawSpec(S.specA,S.specB,S.fs/4096,true);drawWave()}});ro.observe(box);
+show();
+}
+</script>
+</body>
+</html>
