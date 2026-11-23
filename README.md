@@ -19,15 +19,16 @@ A browser-only mastering tool tuned for the typical flaws of AI-generated music.
 - **ラウドネス**：ITU-R BS.1770 準拠のLUFS測定、先読みリミッター。全曲を測り直して目標LUFSとピーク上限に合わせる
 - **聴き比べ**：処理前後を同期再生し、A/B切り替え。音量を揃えた比較が標準（大きいほうが良く聴こえる錯覚を防ぐ）
 - **スペクトル表示**：処理前後を重ねて表示
-- **書き出し**：WAV 24bit／16bit（TPDFディザ付き）
-- **プリセット**：AIこもり除去（標準）、ナチュラル、ボーカルを前に、強めの音圧、音量合わせのみ
+- **ジャンル別プリセット**：J-POP、アニソン・ボカロ、ロック、メタル、EDM・ダンス、ヒップホップ、R&B・ソウル、バラード、アコースティック、ジャズ、クラシック・オーケストラ、Lo-fi・チル、アンビエントの13種類。ワンタップでバランスと目標ラウドネスを合わせ、自動診断の結果（こもりの帯域・量、高域の欠け）で曲ごとに補正
+- **用途別プリセット**：AIこもり除去（標準）、ナチュラル、ボーカルを前に、強めの音圧、音量合わせのみ
+- **書き出し**：WAV 24bit／16bit（TPDFディザ付き）、MP3 320kbps／192kbps
 
 ## 使い方
 
 1. https://reekoby.github.io/ai-mastering-studio/ を開く（Chrome・Edge・Safari の最新版）
 2. 「音源を開く」でMP3/WAVを読み込む（ドロップでも可）。まず「デモ音源で試す」で動作を確認できます
-3. 「診断結果を設定に反映」→ 必要なら各つまみで調整。波形をタップするとプレビュー区間（24秒ループ）を移動できます
-4. 「書き出す」でWAVを保存
+3. ジャンル別プリセットから曲のジャンルを選ぶ（または「診断結果を設定に反映」）→ 必要なら各つまみで調整。波形をタップするとプレビュー区間（24秒ループ）を移動できます
+4. 形式（WAV／MP3）を選んで「書き出す」
 
 **オフラインで使う**：[`index.html`](index.html) をダウンロードしてブラウザーで開くだけで動きます（書体の読み込みのみネット接続が必要）。
 
@@ -45,7 +46,9 @@ A browser-only mastering tool tuned for the typical flaws of AI-generated music.
 
 ローカット → 低域シェルフ → こもりカット（ピーキング）→ 明瞭感（3kHz）→ 高域を4次クロスオーバーで分割してダイナミック抑制 → 空気感（12kHzシェルフ）→ 倍音 → M/S（低域モノ化・幅）→ グルーコンプ → ゲイン → 先読みブリックウォール・リミッター
 
-ライブラリ不要の1ファイル（`index.html`）です。
+本体はライブラリ不要の1ファイル（`index.html`）です。MP3書き出しを使うときだけ、エンコーダー [lamejs](https://github.com/zhuker/lamejs)（LGPL-3.0）をCDNから読み込みます（[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)）。
+
+**オフライン時の注意**：MP3書き出しにはネット接続が必要です（WAVは不要）。
 
 ---
 
@@ -58,7 +61,8 @@ AI Mastering Studio cleans up the mud and the harsh, swirly top end that AI musi
 - Low-mid "mud" cut, a dynamic high-band suppressor for AI shimmer, air shelf, low cut, mono bass (M/S), width, saturation and glue compression
 - BS.1770 loudness measurement and a look-ahead limiter; the export re-measures the whole song to hit the target LUFS and ceiling
 - Synced, loudness-matched A/B, before/after spectrum
-- WAV export (24-bit, or 16-bit with TPDF dither)
+- 13 genre presets (J-POP, anime/Vocaloid, rock, metal, EDM, hip-hop, R&B, ballad, acoustic, jazz, classical, lo-fi, ambient), optionally adjusted by the track's own analysis
+- WAV export (24-bit, or 16-bit with TPDF dither) and MP3 export (320/192 kbps, via lamejs loaded on demand)
 
 Use it at https://reekoby.github.io/ai-mastering-studio/ or download `index.html` and open it locally. No audio ever leaves your device.
 
